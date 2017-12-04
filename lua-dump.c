@@ -506,6 +506,16 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 	} else if (ch == '"') {
 		next_string_token(L,parser);
 		lua_pushlstring(L,parser->token->value.str,parser->token->strlen);
+	} else if (ch >= '0' && ch <= '9') {
+		next_number_token(L,parser);
+		lua_Integer integer = parser->token->value.number;
+		lua_Number number = parser->token->value.number;
+		if (integer == number) {
+			lua_pushinteger(L,integer);
+		} else {
+			lua_pushnumber(L,number);
+		}
+		parser->ptr--;
 	} else if (ch == '{') {
 		unpack_table(L,parser);
 	} else {

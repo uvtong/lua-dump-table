@@ -1,13 +1,20 @@
 local dump = require "dump"
 local util = require "util"
 
-local fd = io.open("Item.lua")
-local str = fd:read("*a")
+local mrq = {
+	girl = "hx",
+	age = 29,
+	hx = {
+		[1] = "1",
+		["live"] = "th",
+		age = 24
+	},
+	haha = {
+		{1,2,3}
+	}
+}
 
-local tbl = load(str)()
-
-
-local str = dump.pack(tbl)
+local str = dump.pack_sort(mrq)
 
 print(str)
 local t = dump.unpack(str)
