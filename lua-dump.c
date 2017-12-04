@@ -528,7 +528,7 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 		luaL_error(L,"unpack key error:unknown ch");
 	}
 
-	assert(expect(parser,',') || expect(parser,'='));
+	assert(expect(parser,',') || expect(parser,'=') || expect(parser,'}'));
 }
 
 void
@@ -542,6 +542,7 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 		next_string_token(L,parser);
 		lua_pushlstring(L,parser->token->value.str,parser->token->strlen);
 		parser->ptr++;
+		skip_space(parser);
 		return;
 	}
 
@@ -555,6 +556,7 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 		} else {
 			lua_pushnumber(L,number);
 		}
+		skip_space(parser);
 		return;
 	}
 
@@ -564,6 +566,7 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 			parser->token->tt = T_NIL;
 			parser->ptr += 3;
 			lua_pushnil(L);
+			skip_space(parser);
 			return;
 		}
 	}
@@ -575,6 +578,7 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 			parser->token->value.boolean = 1;
 			parser->ptr += 4;
 			lua_pushboolean(L,parser->token->value.boolean);
+			skip_space(parser);
 			return;
 		}
 	}
@@ -586,6 +590,7 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 			parser->token->value.boolean = 0;
 			parser->ptr += 5;
 			lua_pushboolean(L,parser->token->value.boolean);
+			skip_space(parser);
 			return;
 		}
 	}
@@ -594,6 +599,7 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 	if (ch == '{') {
 		unpack_table(L,parser);
 		parser->ptr++;
+		skip_space(parser);
 	}
 }
 
@@ -605,9 +611,11 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 
 	parser->ptr++;
 
+	skip_space(parser);
+
 	int i = 1;
 	while(!expect(parser,'}')) {
-		skip_space(parser);
+		
 		if (expect(parser,',')) {
 			next_token(parser);
 			if (expect(parser,'}')) {
@@ -616,6 +624,9 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 				unpack_key(L,parser,i);
 			}
 		} else {
+			if (expect(parser,'}')) {
+				break;
+			}
 			unpack_key(L,parser,i);
 		}
 
@@ -623,6 +634,9 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 			lua_seti(L,-2,i);
 			i++;
 			continue;
+		}
+		if (expect(parser,'}')) {
+			break;
 		}
 		assert(expect(parser,'='));
 
