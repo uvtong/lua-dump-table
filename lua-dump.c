@@ -415,7 +415,7 @@ struct parser_context {
 };
 
 
-static void 
+static inline void 
 skip_space(struct parser_context* parser) {
 	char *n = parser->ptr;
 	while (isspace(*n) && *n) {
@@ -425,12 +425,12 @@ skip_space(struct parser_context* parser) {
 	return;
 }
 
-static int 
+static inline int 
 expect(struct parser_context* parser, char c) {
 	return *parser->ptr == c;
 }
 
-static void 
+static inline void 
 next_token(struct parser_context *parser) {
 	parser->ptr++;
 	skip_space(parser);
@@ -515,9 +515,12 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 		} else {
 			lua_pushnumber(L,number);
 		}
-		parser->ptr--;
+
+		if (expect(parser,','))
+			parser->ptr--;
 	} else if (ch == '{') {
 		unpack_table(L,parser);
+		assert(expect(parser,'}'));
 	} else {
 		luaL_error(L,"unpack key error:unknown ch");
 	}
@@ -597,9 +600,8 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 
 	parser->ptr++;
 
-	int i = 0;
+	int i = 1;
 	while(!expect(parser,'}')) {
-		i++;
 		skip_space(parser);
 		if (expect(parser,',')) {
 			next_token(parser);
@@ -615,6 +617,7 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 		next_token(parser);
 		if (expect(parser,',')) {
 			lua_seti(L,-2,i);
+			i++;
 			continue;
 		}
 		assert(expect(parser,'='));
