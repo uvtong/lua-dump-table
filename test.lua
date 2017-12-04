@@ -24,16 +24,17 @@ local util = require "util"
 local str = dump.pack_sort(Ab)
 
 local now = os.time()
-for i = 1,1024*1024 do
-	local t = dump.unpack(str)
+local t
+for i = 1,1 do
+	t = dump.unpack(str)
 end
-
+util.dump_table(t)
 print(os.time()-now)
 
-local now = os.time()
-str = "return"..str
-for i = 1,1024*1024 do
-	local t = load(str)()
-end
+-- local now = os.time()
+-- str = "return"..str
+-- for i = 1,1024*1024 do
+-- 	local t = load(str)()
+-- end
 
-print(os.time()-now)
+-- print(os.time()-now)

@@ -499,13 +499,17 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 			} else {
 				lua_pushnumber(L,number);
 			}
+			skip_space(parser);
 		} else {
 			luaL_error(L,"unpack key error");
 		}
-		assert(expect(parser,']'));
+		++parser->ptr;
+		skip_space(parser);
 	} else if (ch == '"') {
 		next_string_token(L,parser);
 		lua_pushlstring(L,parser->token->value.str,parser->token->strlen);
+		++parser->ptr;
+		skip_space(parser);
 	} else if (ch >= '0' && ch <= '9') {
 		next_number_token(L,parser);
 		lua_Integer integer = parser->token->value.number;
@@ -515,15 +519,16 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 		} else {
 			lua_pushnumber(L,number);
 		}
-
-		if (expect(parser,','))
-			parser->ptr--;
+		skip_space(parser);
 	} else if (ch == '{') {
 		unpack_table(L,parser);
-		assert(expect(parser,'}'));
+		++parser->ptr;
+		skip_space(parser);
 	} else {
 		luaL_error(L,"unpack key error:unknown ch");
 	}
+
+	assert(expect(parser,',') || expect(parser,'='));
 }
 
 void
@@ -614,7 +619,6 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 			unpack_key(L,parser,i);
 		}
 
-		next_token(parser);
 		if (expect(parser,',')) {
 			lua_seti(L,-2,i);
 			i++;
