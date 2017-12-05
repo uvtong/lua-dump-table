@@ -296,51 +296,86 @@ pack_table(lua_State* L, struct write_buffer* buffer, int index, int depth) {
 void 
 pack_table_sort(lua_State* L, struct write_buffer* buffer, int index, int depth) {
 	table_begin(buffer);
-	int array_size = lua_rawlen(L, index);
-	int i;
-	for (i = 1; i <= array_size; i++) {
-		lua_rawgeti(L, index, i);
-		tab(buffer, depth);
-		pack_value(L, buffer, -1, depth, 1);
-		newline(buffer);
-		lua_pop(L, 1);
-	}
 
 	struct array_context array;
 	array_init(&array);
 
-	lua_pushnil(L);
-	while (lua_next(L, index) != 0) {
-		if (lua_type(L,-2) == LUA_TNUMBER) {
-			int i = (int)lua_tointeger(L, -2);
-			lua_Number n = lua_tonumber(L, -2);
-			if ((lua_Number)i == n) {
-				if (i > 0 && i <= array_size) {
-					lua_pop(L, 1);
-					continue;
-				}
+	if (luaL_getmetafield(L, index, "__pairs") != LUA_TNIL) {
+		// wb_table_metapairs(L, wb, index, depth);
+		lua_pushvalue(L, index);
+		lua_call(L, 1, 3);
+		for(;;) {
+			lua_pushvalue(L, -2);
+			lua_pushvalue(L, -2);
+			lua_copy(L, -5, -3);
+			lua_call(L, 2, 2);
+			int type = lua_type(L, -2);
+			if (type == LUA_TNIL) {
+				lua_pop(L, 4);
+				break;
 			}
+			
+			struct write_buffer* kbuffer = (struct write_buffer*)malloc(sizeof(*kbuffer));
+			buffer_init(kbuffer);
+
+			buffer_addchar(kbuffer, '[');
+			pack_key(L, kbuffer, -2, depth);
+			buffer_addstring(kbuffer, "] = ");
+
+			struct write_buffer* vbuffer = (struct write_buffer*)malloc(sizeof(*vbuffer));
+			buffer_init(vbuffer);
+
+			pack_value(L, vbuffer, -1, depth, 1);
+
+			array_append(&array, kbuffer, vbuffer);
+
+			lua_pop(L, 1);
+		}
+	} else {
+		int array_size = lua_rawlen(L, index);
+		int i;
+		for (i = 1; i <= array_size; i++) {
+			lua_rawgeti(L, index, i);
+			tab(buffer, depth);
+			pack_value(L, buffer, -1, depth, 1);
+			newline(buffer);
+			lua_pop(L, 1);
 		}
 
-		struct write_buffer* kbuffer = (struct write_buffer*)malloc(sizeof(*kbuffer));
-		buffer_init(kbuffer);
+		lua_pushnil(L);
+		while (lua_next(L, index) != 0) {
+			if (lua_type(L,-2) == LUA_TNUMBER) {
+				int i = (int)lua_tointeger(L, -2);
+				lua_Number n = lua_tonumber(L, -2);
+				if ((lua_Number)i == n) {
+					if (i > 0 && i <= array_size) {
+						lua_pop(L, 1);
+						continue;
+					}
+				}
+			}
 
-		buffer_addchar(kbuffer, '[');
-		pack_key(L, kbuffer, -2, depth);
-		buffer_addstring(kbuffer, "] = ");
+			struct write_buffer* kbuffer = (struct write_buffer*)malloc(sizeof(*kbuffer));
+			buffer_init(kbuffer);
 
-		struct write_buffer* vbuffer = (struct write_buffer*)malloc(sizeof(*vbuffer));
-		buffer_init(vbuffer);
+			buffer_addchar(kbuffer, '[');
+			pack_key(L, kbuffer, -2, depth);
+			buffer_addstring(kbuffer, "] = ");
 
-		pack_value(L, vbuffer, -1, depth, 1);
+			struct write_buffer* vbuffer = (struct write_buffer*)malloc(sizeof(*vbuffer));
+			buffer_init(vbuffer);
 
-		array_append(&array, kbuffer, vbuffer);
+			pack_value(L, vbuffer, -1, depth, 1);
 
-		lua_pop(L, 1);
+			array_append(&array, kbuffer, vbuffer);
+
+			lua_pop(L, 1);
+		}
 	}
 	
 	array_sort(&array);
 
+	int i;
 	for (i = 0; i < array.offset;i++) {
 		struct array_kv* kv = array.slots[i];
 		tab(buffer, depth);
