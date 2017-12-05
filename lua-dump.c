@@ -389,27 +389,9 @@ pack_sort(lua_State* L) {
 	return 1;
 }
 
-enum token_type {
-	T_STRING,
-	T_NUMBER,
-	T_NIL,
-	T_BOOL
-};
-
-struct parser_token {
-	enum token_type tt;
-	union {
-		lua_Number number;
-		char* str;
-		int boolean;
-	} value;
-	int strlen;
-};
-
 struct parser_context {
 	char* data;
 	char* ptr;
-	struct parser_token* token;
 	char* reserve;
 	int length;
 };
@@ -452,9 +434,8 @@ next_string_token(lua_State* L,struct parser_context *parser) {
 		parser->ptr++;
 		ch = *parser->ptr;
 	}
-	parser->token->tt = T_STRING;
-	parser->token->value.str = parser->reserve;
-	parser->token->strlen = index;
+
+	lua_pushlstring(L,parser->reserve,index);
 }
 
 void
@@ -471,10 +452,16 @@ next_number_token(lua_State* L,struct parser_context *parser) {
 		parser->ptr++;
 		ch = *parser->ptr;
 	}
-	parser->token->tt = T_NUMBER;
 	lua_pushlstring(L,parser->reserve,index);
-	parser->token->value.number = lua_tonumber(L,-1);
+	lua_Number number = lua_tonumber(L,-1);
+	lua_Integer integer = lua_tointeger(L,-1);
 	lua_pop(L,1);
+
+	if (integer == number) {
+		lua_pushinteger(L,integer);
+	} else {
+		lua_pushnumber(L,number);
+	}
 }
 
 void
@@ -488,17 +475,9 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 		ch = *(++parser->ptr);
 		if (ch == '"') {
 			next_string_token(L,parser);
-			lua_pushlstring(L,parser->token->value.str,parser->token->strlen);
 			parser->ptr++;
 		} else if (ch >= '0' && ch <= '9') {
 			next_number_token(L,parser);
-			lua_Integer integer = parser->token->value.number;
-			lua_Number number = parser->token->value.number;
-			if (integer == number) {
-				lua_pushinteger(L,integer);
-			} else {
-				lua_pushnumber(L,number);
-			}
 			skip_space(parser);
 		} else {
 			luaL_error(L,"unpack key error");
@@ -507,25 +486,42 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 		skip_space(parser);
 	} else if (ch == '"') {
 		next_string_token(L,parser);
-		lua_pushlstring(L,parser->token->value.str,parser->token->strlen);
 		++parser->ptr;
 		skip_space(parser);
 	} else if (ch >= '0' && ch <= '9') {
 		next_number_token(L,parser);
-		lua_Integer integer = parser->token->value.number;
-		lua_Number number = parser->token->value.number;
-		if (integer == number) {
-			lua_pushinteger(L,integer);
-		} else {
-			lua_pushnumber(L,number);
-		}
 		skip_space(parser);
 	} else if (ch == '{') {
 		unpack_table(L,parser);
 		++parser->ptr;
 		skip_space(parser);
+	} else if (ch == 'n') {//nil?
+		if (strncmp(parser->ptr,"nil",3) == 0) {
+			lua_pushnil(L);
+			parser->ptr+=3;
+			skip_space(parser);
+		} else {
+			goto _failed;
+		}
+	} else if (ch == 't') {//true?
+		if (strncmp(parser->ptr,"true",4) == 0) {
+			lua_pushboolean(L,1);
+			parser->ptr+=4;
+			skip_space(parser);
+		} else {
+			goto _failed;
+		}
+	} else if (ch == 'f') {//false?
+		if (strncmp(parser->ptr,"false",5) == 0) {
+			lua_pushboolean(L,0);
+			parser->ptr+=5;
+			skip_space(parser);
+		} else {
+			goto _failed;
+		}
 	} else {
-		luaL_error(L,"unpack key error:unknown ch");
+_failed:
+		luaL_error(L,"unpack key error:unknown ch:%c",ch);
 	}
 
 	assert(expect(parser,',') || expect(parser,'=') || expect(parser,'}'));
@@ -533,14 +529,11 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 
 void
 unpack_value(lua_State* L,struct parser_context *parser) {
-	next_token(parser);
-
 	char ch = *parser->ptr;
 
 	//string?
 	if (ch == '"') {
 		next_string_token(L,parser);
-		lua_pushlstring(L,parser->token->value.str,parser->token->strlen);
 		parser->ptr++;
 		skip_space(parser);
 		return;
@@ -549,13 +542,6 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 	//number?
 	if (ch >= '0' && ch <= '9') {
 		next_number_token(L,parser);
-		lua_Integer integer = parser->token->value.number;
-		lua_Number number = parser->token->value.number;
-		if (integer == number) {
-			lua_pushinteger(L,integer);
-		} else {
-			lua_pushnumber(L,number);
-		}
 		skip_space(parser);
 		return;
 	}
@@ -563,9 +549,8 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 	//nil?
 	if (ch == 'n') {
 		if (strncmp(parser->ptr,"nil",3) == 0) {
-			parser->token->tt = T_NIL;
-			parser->ptr += 3;
 			lua_pushnil(L);
+			parser->ptr+=3;
 			skip_space(parser);
 			return;
 		}
@@ -574,10 +559,8 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 	//true?
 	if (ch == 't') {
 		if (strncmp(parser->ptr,"true",4) == 0) {
-			parser->token->tt = T_BOOL;
-			parser->token->value.boolean = 1;
-			parser->ptr += 4;
-			lua_pushboolean(L,parser->token->value.boolean);
+			lua_pushboolean(L,1);
+			parser->ptr+=4;
 			skip_space(parser);
 			return;
 		}
@@ -586,10 +569,8 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 	//false?
 	if (ch == 'f') {
 		if (strncmp(parser->ptr,"false",5) == 0) {
-			parser->token->tt = T_BOOL;
-			parser->token->value.boolean = 0;
-			parser->ptr += 5;
-			lua_pushboolean(L,parser->token->value.boolean);
+			lua_pushboolean(L,0);
+			parser->ptr+=5;
 			skip_space(parser);
 			return;
 		}
@@ -600,7 +581,10 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 		unpack_table(L,parser);
 		parser->ptr++;
 		skip_space(parser);
+		return;
 	}
+
+	luaL_error(L,"unpack value error:unknown ch%c",ch);
 }
 
 void
@@ -615,18 +599,10 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 
 	int i = 1;
 	while(!expect(parser,'}')) {
-		
 		if (expect(parser,',')) {
 			next_token(parser);
-			if (expect(parser,'}')) {
-				break;
-			} else {
-				unpack_key(L,parser,i);
-			}
+			continue;
 		} else {
-			if (expect(parser,'}')) {
-				break;
-			}
 			unpack_key(L,parser,i);
 		}
 
@@ -636,11 +612,15 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 			continue;
 		}
 		if (expect(parser,'}')) {
+			lua_seti(L,-2,i);
+			i++;
 			break;
 		}
 		assert(expect(parser,'='));
 
+		next_token(parser);
 		unpack_value(L,parser);
+
 		lua_settable(L,-3);
 	}
 }
@@ -650,14 +630,12 @@ unpack(lua_State* L) {
 	size_t size;
 	const char* str = luaL_checklstring(L,1,&size);
 	struct parser_context parser;
-	struct parser_token token;
-
 	parser.data = (char*)str;
 	parser.ptr = parser.data;
-	parser.token = &token;
 	parser.reserve = malloc(64);
 	parser.length = 64;
 
+	skip_space(&parser);
 	unpack_table(L,&parser);
 
 	free(parser.reserve);

@@ -21,20 +21,25 @@ local util = require "util"
 	 	}
 	 }
 
-local str = dump.pack_sort(Ab)
+-- local str = dump.pack_sort(Ab)
+
+local fd = io.open("Item.lua","r")
+local str = fd:read("*a")
+fd:close()
 
 local now = os.time()
 local t
-for i = 1,1 do
+for i = 1,10 do
 	t = dump.unpack(str)
 end
 util.dump_table(t)
 print(os.time()-now)
 
--- local now = os.time()
--- str = "return"..str
--- for i = 1,1024*1024 do
--- 	local t = load(str)()
--- end
 
--- print(os.time()-now)
+local now = os.time()
+str = "return"..str
+for i = 1,10 do
+	local t = load(str)()
+end
+
+print(os.time()-now)

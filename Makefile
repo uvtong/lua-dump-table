@@ -1,3 +1,3 @@
 
 all:
-	gcc -g -Wall -O3 -fPIC --shared lua-dump.c -I./lua-src/src -o dump.so
+	gcc -g -Wall -fPIC --shared lua-dump.c -I./lua-src/src -o dump.so
