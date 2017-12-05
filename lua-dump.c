@@ -443,7 +443,7 @@ next_number_token(lua_State* L,struct parser_context *parser) {
 	char ch = *parser->ptr;
 
 	int index = 0;
-	while((ch >= '0' && ch <= '9') || ch == '.') {
+	while(ch == '+' || ch == '-' || (ch >= '0' && ch <= '9') || ch == '.') {
 		if (index >= parser->length) {
 			parser->reserve = realloc(parser->reserve,parser->length*2);
 			parser->length *= 2;
@@ -476,7 +476,7 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 		if (ch == '"') {
 			next_string_token(L,parser);
 			parser->ptr++;
-		} else if (ch >= '0' && ch <= '9') {
+		} else if (ch == '+' || ch == '-' || (ch >= '0' && ch <= '9')) {
 			next_number_token(L,parser);
 			skip_space(parser);
 		} else {
@@ -484,14 +484,14 @@ unpack_key(lua_State* L,struct parser_context *parser,int i) {
 		}
 		++parser->ptr;
 		skip_space(parser);
-	} else if (ch == '"') {
+	} else if (ch == '"') {//string?
 		next_string_token(L,parser);
 		++parser->ptr;
 		skip_space(parser);
-	} else if (ch >= '0' && ch <= '9') {
+	} else if (ch == '+' || ch == '-' || (ch >= '0' && ch <= '9')) {
 		next_number_token(L,parser);
 		skip_space(parser);
-	} else if (ch == '{') {
+	} else if (ch == '{') {//table?
 		unpack_table(L,parser);
 		++parser->ptr;
 		skip_space(parser);
@@ -540,7 +540,7 @@ unpack_value(lua_State* L,struct parser_context *parser) {
 	}
 
 	//number?
-	if (ch >= '0' && ch <= '9') {
+	if (ch == '+' || ch == '-' || (ch >= '0' && ch <= '9')) {
 		next_number_token(L,parser);
 		skip_space(parser);
 		return;
