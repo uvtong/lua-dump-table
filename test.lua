@@ -29,7 +29,7 @@ fd:close()
 
 local now = os.time()
 local t
-for i = 1,100 do
+for i = 1,10 do
 	t = dump.unpack(str)
 end
 -- util.dump_table(t)
@@ -38,7 +38,7 @@ print(os.time()-now)
 
 local now = os.time()
 str = "return"..str
-for i = 1,100 do
+for i = 1,0 do
 	local t = load(str)()
 end
 

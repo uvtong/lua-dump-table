@@ -454,10 +454,10 @@ next_number_token(lua_State* L,struct parser_context *parser) {
 	}
 	lua_pushlstring(L,parser->reserve,index);
 	lua_Number number = lua_tonumber(L,-1);
-	lua_Integer integer = lua_tointeger(L,-1);
+	lua_Integer integer = number;
 	lua_pop(L,1);
 
-	if (integer == number) {
+	if ((lua_Number)integer == number) {
 		lua_pushinteger(L,integer);
 	} else {
 		lua_pushnumber(L,number);
