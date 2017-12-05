@@ -621,7 +621,7 @@ unpack_table(lua_State* L,struct parser_context *parser) {
 		next_token(parser);
 		unpack_value(L,parser);
 
-		lua_settable(L,-3);
+		lua_rawset(L,-3);
 	}
 }
 
